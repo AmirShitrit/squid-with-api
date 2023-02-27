@@ -8,7 +8,7 @@ import (
 )
 
 type ProxiesStore interface {
-	GetProxyDetails(string) *url.URL
+	GetProxyDetails(string) (*url.URL, bool)
 }
 
 type ConfigServer struct {
@@ -22,8 +22,12 @@ func NewConfigServer(store ProxiesStore) *ConfigServer {
 func (c *ConfigServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	proxy := strings.TrimPrefix(r.URL.Path, "/proxies/")
 
-	details := c.store.GetProxyDetails(proxy).String()
-	fmt.Fprint(w, details)
+	details, ok := c.store.GetProxyDetails(proxy)
 
-	// fmt.Fprint(w, "http://proxy0:1000\nhttp://proxy1:1001")
+	if !ok {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	fmt.Fprint(w, details.String())
 }

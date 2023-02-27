@@ -13,9 +13,9 @@ type StubProxiesStore struct {
 	proxies map[string]*url.URL
 }
 
-func (s *StubProxiesStore) GetProxyDetails(host string) *url.URL {
-	details := s.proxies[host]
-	return details
+func (s *StubProxiesStore) GetProxyDetails(host string) (*url.URL, bool) {
+	details, ok := s.proxies[host]
+	return details, ok
 }
 
 func TestGetProxies(t *testing.T) {
@@ -37,6 +37,8 @@ func TestGetProxies(t *testing.T) {
 
 		server.ServeHTTP(response, request)
 
+		assertResponseStatus(t, response.Code, http.StatusOK)
+
 		got := response.Body.String()
 		want := "http://proxy0:1000"
 		assertResponseBody(t, got, want)
@@ -48,8 +50,22 @@ func TestGetProxies(t *testing.T) {
 
 		server.ServeHTTP(response, request)
 
+		assertResponseStatus(t, response.Code, http.StatusOK)
+
 		got := response.Body.String()
 		want := "http://proxy1:1001"
+		assertResponseBody(t, got, want)
+	})
+
+	t.Run("returns 404 on missing proxies", func(t *testing.T) {
+		request := newGetProxyDetailsRequest("non-existing-proxy")
+		response := httptest.NewRecorder()
+
+		server.ServeHTTP(response, request)
+
+		got := response.Code
+		want := http.StatusNotFound
+
 		assertResponseBody(t, got, want)
 	})
 
@@ -76,6 +92,14 @@ func TestGetProxies(t *testing.T) {
 func newGetProxyDetailsRequest(proxy string) *http.Request {
 	req, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("/proxies/%s", proxy), nil)
 	return req
+}
+
+func assertResponseStatus(t testing.TB, got, want int) {
+	t.Helper()
+
+	if got != want {
+		t.Errorf("got wrong status code: expected %d, but got %d", want, got)
+	}
 }
 
 func assertResponseBody(t testing.TB, got, want any) {
