@@ -98,7 +98,31 @@ func TestGetProxies(t *testing.T) {
 	})
 }
 
-func TestStoreProxies(t *testing.T) {
+func TestUpdateProxies(t *testing.T) {
+	store := StubProxiesStore{
+		map[string]*url.URL{
+			"proxy0": {Scheme: "http", Host: "proxy0:1000"},
+		},
+	}
+	server := &ConfigServer{&store}
+
+	t.Run("it returns accepted on PUT", func(t *testing.T) {
+		newUrl := "http://proxy0:10001"
+		request := newPutProxyRequest(newUrl)
+		response := httptest.NewRecorder()
+
+		server.ServeHTTP(response, request)
+
+		assertResponseStatus(t, response.Code, http.StatusAccepted)
+		got := store.proxies["proxy0"].String()
+		want := newUrl
+		if got != want {
+			t.Errorf("got %s, want %s", got, want)
+		}
+	})
+}
+
+func TestAddProxies(t *testing.T) {
 	store := StubProxiesStore{
 		map[string]*url.URL{},
 	}
@@ -152,11 +176,17 @@ func newGetProxyDetailsRequest(proxy string) *http.Request {
 	return req
 }
 
-func newPostProxyRequest(proxy string) *http.Request {
+func newPutProxyRequest(proxy string) *http.Request {
 	withoutSchema := strings.TrimPrefix(proxy, "http://")
 	hostName := withoutSchema[0:strings.Index(withoutSchema, ":")]
 	body := strings.NewReader(proxy)
-	req, _ := http.NewRequest(http.MethodPost, fmt.Sprintf("/proxies/%s", hostName), body)
+	req, _ := http.NewRequest(http.MethodPut, fmt.Sprintf("/proxies/%s", hostName), body)
+	return req
+}
+
+func newPostProxyRequest(proxy string) *http.Request {
+	body := strings.NewReader(proxy)
+	req, _ := http.NewRequest(http.MethodPost, "/proxies", body)
 	return req
 }
 

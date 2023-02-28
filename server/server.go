@@ -28,31 +28,66 @@ func (c *ConfigServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodPost:
 		c.processNewProxy(w, r)
+	case http.MethodPut:
+		c.processUpdateProxy(w, r)
 	case http.MethodGet:
 		c.processGetProxy(w, r)
+	default:
+		w.WriteHeader(http.StatusMethodNotAllowed)
 	}
 }
 
-func (c *ConfigServer) processNewProxy(w http.ResponseWriter, r *http.Request) {
+func parseBodyAsUrl(w http.ResponseWriter, r *http.Request) (*url.URL, bool) {
 	buf, _ := io.ReadAll(r.Body)
 	proxy := string(buf)
 	proxyUrl, err := url.ParseRequestURI(proxy)
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		fmt.Fprint(w, "Malformed Proxy URL")
+		sendBadRequest(w, "Malformed Proxy URL")
+		return nil, false
+	}
+
+	return proxyUrl, true
+}
+
+func (c *ConfigServer) processNewProxy(w http.ResponseWriter, r *http.Request) {
+	proxyUrl, ok := parseBodyAsUrl(w, r)
+	if !ok {
 		return
 	}
 
 	host := proxyUrl.Hostname()
 	_, listed := c.store.GetProxyDetails(host)
 	if listed {
-		w.WriteHeader(http.StatusBadRequest)
-		fmt.Fprint(w, "Proxy Already Listed")
+		sendBadRequest(w, "Proxy Already Listed")
 		return
 	}
 
 	c.store.SetProxy(host, proxyUrl)
 	w.WriteHeader(http.StatusAccepted)
+}
+
+func (c *ConfigServer) processUpdateProxy(w http.ResponseWriter, r *http.Request) {
+	host := strings.TrimPrefix(r.URL.Path, "/proxies/")
+
+	proxyUrl, ok := parseBodyAsUrl(w, r)
+	if !ok {
+		return
+	}
+
+	hostFromBody := proxyUrl.Hostname()
+
+	if hostFromBody != host {
+		sendBadRequest(w, "Request path doesn't match URL in body")
+		return
+	}
+
+	c.store.SetProxy(host, proxyUrl)
+	w.WriteHeader(http.StatusAccepted)
+}
+
+func sendBadRequest(w http.ResponseWriter, msg string) {
+	w.WriteHeader(http.StatusBadRequest)
+	fmt.Fprint(w, msg)
 }
 
 func (c *ConfigServer) processGetProxy(w http.ResponseWriter, r *http.Request) {
@@ -64,9 +99,8 @@ func (c *ConfigServer) processGetProxy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	proxy := strings.TrimPrefix(r.URL.Path, "/proxies/")
-
-	proxyUrl, ok := c.store.GetProxyDetails(proxy)
+	host := strings.TrimPrefix(r.URL.Path, "/proxies/")
+	proxyUrl, ok := c.store.GetProxyDetails(host)
 
 	if !ok {
 		w.WriteHeader(http.StatusNotFound)
