@@ -15,6 +15,14 @@ func (i *InMemoryProxiesStore) GetProxyDetails(host string) (*url.URL, bool) {
 	return &url.URL{Scheme: "http", Host: "proxy9:1009"}, true
 }
 
+func (i *InMemoryProxiesStore) GetAll() []*url.URL {
+	return []*url.URL{{Scheme: "http", Host: "proxy9:1009"}}
+}
+
+func (i *InMemoryProxiesStore) SetProxy(string, *url.URL) error {
+	return nil
+}
+
 const port = 5000
 
 func main() {

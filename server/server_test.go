@@ -6,7 +6,11 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"reflect"
+	"strings"
 	"testing"
+
+	"golang.org/x/exp/maps"
+	"golang.org/x/exp/slices"
 )
 
 type StubProxiesStore struct {
@@ -14,15 +18,20 @@ type StubProxiesStore struct {
 }
 
 func (s *StubProxiesStore) GetProxyDetails(host string) (*url.URL, bool) {
-	details, ok := s.proxies[host]
-	return details, ok
+	proxyUrl, ok := s.proxies[host]
+	return proxyUrl, ok
+}
+
+func (s *StubProxiesStore) GetAll() []*url.URL {
+	return maps.Values(s.proxies)
+}
+
+func (s *StubProxiesStore) SetProxy(host string, proxyUrl *url.URL) error {
+	s.proxies[host] = proxyUrl
+	return nil
 }
 
 func TestGetProxies(t *testing.T) {
-	t.Run("playground", func(t *testing.T) {
-		t.Skip()
-	})
-
 	stubProxiesStore := StubProxiesStore{
 		map[string]*url.URL{
 			"proxy0": {Scheme: "http", Host: "proxy0:1000"},
@@ -69,28 +78,85 @@ func TestGetProxies(t *testing.T) {
 		assertResponseBody(t, got, want)
 	})
 
-	// t.Run("returns all proxies", func(t *testing.T) {
-	// 	request, _ := http.NewRequest(http.MethodGet, "/proxies", nil)
-	// 	response := httptest.NewRecorder()
+	t.Run("returns all proxies", func(t *testing.T) {
+		request, _ := http.NewRequest(http.MethodGet, "/proxies", nil)
+		response := httptest.NewRecorder()
 
-	// 	ConfigServer(response, request)
+		server.ServeHTTP(response, request)
 
-	// 	body := response.Body.String()
-	// 	got := strings.Split(body, "\n")
-	// 	slices.Sort(got)
-	// 	want := []string{
-	// 		"http://proxy0:1000",
-	// 		"http://proxy1:1001",
-	// 		// "http://user2:password2@proxy2:1002",
-	// 		// "http://user3:password3@proxy3:1003",
-	// 	}
-	// 	slices.Sort(want)
-	// 	assertResponseBody(t, got, want)
-	// })
+		body := response.Body.String()
+		got := strings.Split(body, "\n")
+		slices.Sort(got)
+		want := []string{
+			"http://proxy0:1000",
+			"http://proxy1:1001",
+			// "http://user2:password2@proxy2:1002",
+			// "http://user3:password3@proxy3:1003",
+		}
+		slices.Sort(want)
+		assertResponseBody(t, got, want)
+	})
+}
+
+func TestStoreProxies(t *testing.T) {
+	store := StubProxiesStore{
+		map[string]*url.URL{},
+	}
+	server := &ConfigServer{&store}
+
+	t.Run("it returns accepted on POST", func(t *testing.T) {
+		request := newPostProxyRequest("http://proxy3:1003")
+		response := httptest.NewRecorder()
+
+		server.ServeHTTP(response, request)
+
+		assertResponseStatus(t, response.Code, http.StatusAccepted)
+
+		if len(store.proxies) != 1 {
+			t.Fatalf("Expected 1 proxy, but got %d", len(store.proxies))
+		}
+
+		if _, ok := store.proxies["proxy3"]; !ok {
+			t.Errorf("proxy3 was not saved")
+		}
+	})
+
+	t.Run("it returns 400 Bad Request on malformed URL", func(t *testing.T) {
+		request := newPostProxyRequest("not a URL:")
+		response := httptest.NewRecorder()
+
+		server.ServeHTTP(response, request)
+
+		assertResponseStatus(t, response.Code, http.StatusBadRequest)
+
+		got := response.Body.String()
+		want := "Malformed Proxy URL"
+		assertResponseBody(t, got, want)
+	})
+
+	t.Run("it returns 400 Bad Request on proxy already exists", func(t *testing.T) {
+		server.ServeHTTP(httptest.NewRecorder(), newPostProxyRequest("http://proxy1:1001"))
+
+		response := httptest.NewRecorder()
+		server.ServeHTTP(response, newPostProxyRequest("http://proxy1:1001"))
+
+		assertResponseStatus(t, response.Code, http.StatusBadRequest)
+		got := response.Body.String()
+		want := "Proxy Already Listed"
+		assertResponseBody(t, got, want)
+	})
 }
 
 func newGetProxyDetailsRequest(proxy string) *http.Request {
 	req, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("/proxies/%s", proxy), nil)
+	return req
+}
+
+func newPostProxyRequest(proxy string) *http.Request {
+	withoutSchema := strings.TrimPrefix(proxy, "http://")
+	hostName := withoutSchema[0:strings.Index(withoutSchema, ":")]
+	body := strings.NewReader(proxy)
+	req, _ := http.NewRequest(http.MethodPost, fmt.Sprintf("/proxies/%s", hostName), body)
 	return req
 }
 
