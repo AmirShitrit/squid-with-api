@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"reflect"
 	"strings"
 	"testing"
@@ -14,26 +13,26 @@ import (
 )
 
 type StubProxiesStore struct {
-	proxies map[string]*url.URL
+	proxies map[string]ProxyUrl
 }
 
-func (s *StubProxiesStore) GetProxyDetails(host string) (*url.URL, bool) {
+func (s *StubProxiesStore) GetProxyDetails(host string) (ProxyUrl, bool) {
 	proxyUrl, ok := s.proxies[host]
 	return proxyUrl, ok
 }
 
-func (s *StubProxiesStore) GetAll() []*url.URL {
-	return maps.Values(s.proxies)
+func (s *StubProxiesStore) GetAll() ([]ProxyUrl, error) {
+	return maps.Values(s.proxies), nil
 }
 
-func (s *StubProxiesStore) SetProxy(host string, proxyUrl *url.URL) error {
+func (s *StubProxiesStore) SetProxy(host string, proxyUrl ProxyUrl) error {
 	s.proxies[host] = proxyUrl
 	return nil
 }
 
 func TestGetProxies(t *testing.T) {
 	stubProxiesStore := StubProxiesStore{
-		map[string]*url.URL{
+		map[string]ProxyUrl{
 			"proxy0": {Scheme: "http", Host: "proxy0:1000"},
 			"proxy1": {Scheme: "http", Host: "proxy1:1001"},
 		},
@@ -100,7 +99,7 @@ func TestGetProxies(t *testing.T) {
 
 func TestUpdateProxies(t *testing.T) {
 	store := StubProxiesStore{
-		map[string]*url.URL{
+		map[string]ProxyUrl{
 			"proxy0": {Scheme: "http", Host: "proxy0:1000"},
 		},
 	}
@@ -124,7 +123,7 @@ func TestUpdateProxies(t *testing.T) {
 
 func TestAddProxies(t *testing.T) {
 	store := StubProxiesStore{
-		map[string]*url.URL{},
+		map[string]ProxyUrl{},
 	}
 	server := &ConfigServer{&store}
 

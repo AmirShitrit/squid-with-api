@@ -15,7 +15,7 @@ type ProxyUrl = *url.URL
 type ProxiesStore interface {
 	GetProxyDetails(string) (ProxyUrl, bool)
 	SetProxy(string, ProxyUrl) error
-	GetAll() []ProxyUrl
+	GetAll() ([]ProxyUrl, error)
 }
 
 type ConfigServer struct {
@@ -95,7 +95,13 @@ func sendBadRequest(w http.ResponseWriter, msg string) {
 func (c *ConfigServer) processGetProxy(w http.ResponseWriter, r *http.Request) {
 	shouldGetAll := strings.HasSuffix(strings.TrimSuffix(r.URL.Path, "/"), "/proxies")
 	if shouldGetAll {
-		allProxyUrls := c.store.GetAll()
+		allProxyUrls, err := c.store.GetAll()
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprintf(w, "failed to get all proxies due to: %s", err)
+			return
+		}
+
 		all := strings.Join(lo.Map(allProxyUrls, func(u ProxyUrl, _ int) string { return u.String() }), "\n")
 		fmt.Fprint(w, all)
 		return
