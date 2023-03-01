@@ -26,7 +26,7 @@ func (i *InMemoryProxiesStore) SetProxy(string, *url.URL) error {
 const port = 5000
 
 func main() {
-	server := server.NewConfigServer(&InMemoryProxiesStore{})
+	server := server.NewConfigServer(&server.InMemoryProxiesStore{})
 	log.Printf("Listening on port %d", port)
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", 5000), server))
 }
