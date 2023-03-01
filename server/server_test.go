@@ -176,6 +176,11 @@ func newGetProxyDetailsRequest(proxy string) *http.Request {
 	return req
 }
 
+func newGetAllRequest() *http.Request {
+	req, _ := http.NewRequest(http.MethodGet, "/proxies", nil)
+	return req
+}
+
 func newPutProxyRequest(proxy string) *http.Request {
 	withoutSchema := strings.TrimPrefix(proxy, "http://")
 	hostName := withoutSchema[0:strings.Index(withoutSchema, ":")]

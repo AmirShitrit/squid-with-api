@@ -10,10 +10,12 @@ import (
 	"github.com/samber/lo"
 )
 
+type ProxyUrl = *url.URL
+
 type ProxiesStore interface {
-	GetProxyDetails(string) (*url.URL, bool)
-	SetProxy(string, *url.URL) error
-	GetAll() []*url.URL
+	GetProxyDetails(string) (ProxyUrl, bool)
+	SetProxy(string, ProxyUrl) error
+	GetAll() []ProxyUrl
 }
 
 type ConfigServer struct {
@@ -37,7 +39,7 @@ func (c *ConfigServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func parseBodyAsUrl(w http.ResponseWriter, r *http.Request) (*url.URL, bool) {
+func parseBodyAsUrl(w http.ResponseWriter, r *http.Request) (ProxyUrl, bool) {
 	buf, _ := io.ReadAll(r.Body)
 	proxy := string(buf)
 	proxyUrl, err := url.ParseRequestURI(proxy)
@@ -94,7 +96,7 @@ func (c *ConfigServer) processGetProxy(w http.ResponseWriter, r *http.Request) {
 	shouldGetAll := strings.HasSuffix(strings.TrimSuffix(r.URL.Path, "/"), "/proxies")
 	if shouldGetAll {
 		allProxyUrls := c.store.GetAll()
-		all := strings.Join(lo.Map(allProxyUrls, func(u *url.URL, _ int) string { return u.String() }), "\n")
+		all := strings.Join(lo.Map(allProxyUrls, func(u ProxyUrl, _ int) string { return u.String() }), "\n")
 		fmt.Fprint(w, all)
 		return
 	}
