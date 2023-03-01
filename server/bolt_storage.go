@@ -50,8 +50,8 @@ func getProxiesBucket(tx *bolt.Tx) *bolt.Bucket {
 	return bucket
 }
 
-func (s *BoltStorage) GetProxyDetails(host string) (proxy ProxyUrl, found bool) {
-	err := s.db.View(func(tx *bolt.Tx) error {
+func (s *BoltStorage) GetProxyDetails(host string) (proxy ProxyUrl, found bool, err error) {
+	dbErr := s.db.View(func(tx *bolt.Tx) error {
 		bucket := getProxiesBucket(tx)
 
 		proxyBytes := bucket.Get([]byte(host))
@@ -67,9 +67,8 @@ func (s *BoltStorage) GetProxyDetails(host string) (proxy ProxyUrl, found bool) 
 		return err
 	})
 
-	if err != nil {
-		// TODO: Return it!
-		log.Fatal(err)
+	if dbErr != nil {
+		err = fmt.Errorf("failed to get proxy details: %w", dbErr)
 	}
 
 	return

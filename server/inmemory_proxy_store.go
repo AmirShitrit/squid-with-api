@@ -15,11 +15,11 @@ func NewInMemoryProxiesStore() *InMemoryProxiesStore {
 	return &InMemoryProxiesStore{make(map[string]ProxyUrl), sync.Mutex{}}
 }
 
-func (i *InMemoryProxiesStore) GetProxyDetails(host string) (ProxyUrl, bool) {
+func (i *InMemoryProxiesStore) GetProxyDetails(host string) (ProxyUrl, bool, error) {
 	i.lock.Lock()
 	defer i.lock.Unlock()
 	proxy, ok := i.proxies[host]
-	return proxy, ok
+	return proxy, ok, nil
 }
 
 func (i *InMemoryProxiesStore) GetAll() ([]ProxyUrl, error) {

@@ -16,9 +16,9 @@ type StubProxiesStore struct {
 	proxies map[string]ProxyUrl
 }
 
-func (s *StubProxiesStore) GetProxyDetails(host string) (ProxyUrl, bool) {
+func (s *StubProxiesStore) GetProxyDetails(host string) (ProxyUrl, bool, error) {
 	proxyUrl, ok := s.proxies[host]
-	return proxyUrl, ok
+	return proxyUrl, ok, nil
 }
 
 func (s *StubProxiesStore) GetAll() ([]ProxyUrl, error) {

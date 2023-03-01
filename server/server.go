@@ -13,7 +13,7 @@ import (
 type ProxyUrl = *url.URL
 
 type ProxiesStore interface {
-	GetProxyDetails(string) (ProxyUrl, bool)
+	GetProxyDetails(string) (ProxyUrl, bool, error)
 	SetProxy(string, ProxyUrl) error
 	GetAll() ([]ProxyUrl, error)
 }
@@ -58,7 +58,12 @@ func (c *ConfigServer) processNewProxy(w http.ResponseWriter, r *http.Request) {
 	}
 
 	host := proxyUrl.Hostname()
-	_, listed := c.store.GetProxyDetails(host)
+	_, listed, err := c.store.GetProxyDetails(host)
+	if err != nil {
+		sendInternalError(w, fmt.Sprintf("failed to add new proxy: %s", err))
+		return
+	}
+
 	if listed {
 		sendBadRequest(w, "Proxy Already Listed")
 		return
@@ -88,7 +93,15 @@ func (c *ConfigServer) processUpdateProxy(w http.ResponseWriter, r *http.Request
 }
 
 func sendBadRequest(w http.ResponseWriter, msg string) {
-	w.WriteHeader(http.StatusBadRequest)
+	sendResponse(w, http.StatusBadRequest, msg)
+}
+
+func sendInternalError(w http.ResponseWriter, msg string) {
+	sendResponse(w, http.StatusInternalServerError, msg)
+}
+
+func sendResponse(w http.ResponseWriter, status int, msg string) {
+	w.WriteHeader(status)
 	fmt.Fprint(w, msg)
 }
 
@@ -108,7 +121,11 @@ func (c *ConfigServer) processGetProxy(w http.ResponseWriter, r *http.Request) {
 	}
 
 	host := strings.TrimPrefix(r.URL.Path, "/proxies/")
-	proxyUrl, ok := c.store.GetProxyDetails(host)
+	proxyUrl, ok, err := c.store.GetProxyDetails(host)
+	if err != nil {
+		sendInternalError(w, fmt.Sprintf("failed to get proxy: %s", err))
+		return
+	}
 
 	if !ok {
 		w.WriteHeader(http.StatusNotFound)
